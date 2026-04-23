@@ -1,0 +1,6 @@
+{
+  "name": "Audio Lab",
+  "description": "A comprehensive cloud-based audio editing suite with waveform visualization, regions, and web audio effects.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
