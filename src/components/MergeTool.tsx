@@ -11,16 +11,18 @@ export interface TrackData extends MixdownTrack {
   name: string;
 }
 
-const TrackRow = ({
-  track,
-  onUpdate,
-  onRemove,
-  registerWs
-}: {
+interface TrackRowProps {
   track: TrackData;
   onUpdate: (id: string, updates: Partial<TrackData>) => void;
   onRemove: (id: string) => void;
   registerWs: (id: string, ws: WaveSurfer | null) => void;
+}
+
+const TrackRow: React.FC<TrackRowProps> = ({
+  track,
+  onUpdate,
+  onRemove,
+  registerWs
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WaveSurfer | null>(null);

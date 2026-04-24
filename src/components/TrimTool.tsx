@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.esm.js';
 import TimelinePlugin from 'wavesurfer.js/dist/plugins/timeline.esm.js';
-import { Play, Pause, Square, Upload, Download, ArrowLeft, Scissors, Crop, Loader2, Wand2, Undo, Redo } from 'lucide-react';
+import { Play, Pause, Square, Upload, Download, ArrowLeft, Scissors, Crop, Loader2, Wand2, Undo, Redo, Plus, Minus } from 'lucide-react';
 import { audioBufferToWav } from '../lib/audioUtils';
 import AudioEffectsPanel from './AudioEffectsPanel';
 import { useHistory } from '../lib/useHistory';
@@ -18,6 +18,30 @@ export default function TrimTool({ onBack }: { onBack: () => void }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [hasRegion, setHasRegion] = useState(false);
   const [showEffects, setShowEffects] = useState(false);
+  
+  const [regionStart, setRegionStart] = useState<number>(0);
+  const [regionEnd, setRegionEnd] = useState<number>(0);
+  const [audioDuration, setAudioDuration] = useState<number>(0);
+  const [trimStep, setTrimStep] = useState<number>(0.1);
+
+  const regionStartRef = useRef<number>(0);
+  const regionEndRef = useRef<number>(0);
+  const isPreviewingRef = useRef<boolean>(false);
+
+  const STEP_OPTIONS = [
+    { label: '0.1s', value: 0.1 },
+    { label: '150ms', value: 0.15 },
+    { label: '500ms', value: 0.5 },
+    { label: '1s', value: 1 },
+    { label: '5s', value: 5 },
+    { label: '1m', value: 60 },
+    { label: '2m', value: 120 },
+    { label: '10m', value: 600 },
+    { label: '15m', value: 900 },
+    { label: '20m', value: 1200 },
+    { label: '30m', value: 1800 },
+    { label: '1h', value: 3600 },
+  ];
 
   const { 
     state: audioBlob, 
@@ -32,14 +56,18 @@ export default function TrimTool({ onBack }: { onBack: () => void }) {
   // Synchronize wavesurfer any time the blob changes (e.g. from upload, crop, FX, undo, redo)
   useEffect(() => {
     if (wavesurferRef.current) {
+      regionsPluginRef.current?.clearRegions();
+      setHasRegion(false);
+      setRegionStart(0);
+      setRegionEnd(0);
+      setAudioDuration(0);
+      
       if (audioBlob) {
         const objectUrl = URL.createObjectURL(audioBlob);
         wavesurferRef.current.load(objectUrl);
       } else {
         wavesurferRef.current.empty();
       }
-      regionsPluginRef.current?.clearRegions();
-      setHasRegion(false);
     }
   }, [audioBlob]);
 
@@ -70,14 +98,54 @@ export default function TrimTool({ onBack }: { onBack: () => void }) {
     ws.on('play', () => setIsPlaying(true));
     ws.on('pause', () => setIsPlaying(false));
     ws.on('finish', () => setIsPlaying(false));
+    ws.on('timeupdate', (currentTime) => {
+      if (isPreviewingRef.current && regionEndRef.current > 0) {
+        if (currentTime >= regionEndRef.current) {
+          ws.setTime(regionStartRef.current);
+          ws.play(); // force loop playback
+        }
+      }
+    });
 
-    wsRegions.on('region-created', () => {
+    ws.on('decode', (dur) => {
+      setAudioDuration(dur);
+      
+      regionStartRef.current = 0;
+      regionEndRef.current = dur;
+
+      // Auto-initialize a full region so precision sliders become immediately visible and usable
+      if (!regionsPluginRef.current) return;
+      regionsPluginRef.current.clearRegions();
+      regionsPluginRef.current.addRegion({
+        start: 0,
+        end: dur,
+        color: 'rgba(255, 255, 255, 0.2)',
+        resize: true,
+        drag: true,
+      });
+      setRegionStart(0);
+      setRegionEnd(dur);
+      setHasRegion(true);
+    });
+
+    wsRegions.on('region-created', (region) => {
       // Clear all other regions so only one exists at a time
       const regions = wsRegions.getRegions();
       if (regions.length > 1) {
         regions[0].remove(); // remove old selection
       }
       setHasRegion(true);
+      setRegionStart(region.start);
+      setRegionEnd(region.end);
+      regionStartRef.current = region.start;
+      regionEndRef.current = region.end;
+    });
+
+    wsRegions.on('region-updated', (region) => {
+      setRegionStart(region.start);
+      setRegionEnd(region.end);
+      regionStartRef.current = region.start;
+      regionEndRef.current = region.end;
     });
 
     wsRegions.on('region-removed', () => {
@@ -99,11 +167,28 @@ export default function TrimTool({ onBack }: { onBack: () => void }) {
   };
 
   const handlePlayPause = () => {
-    wavesurferRef.current?.playPause();
+    if (!wavesurferRef.current) return;
+    const ws = wavesurferRef.current;
+    if (ws.isPlaying()) {
+      ws.pause();
+      isPreviewingRef.current = false;
+    } else {
+      isPreviewingRef.current = true;
+      const current = ws.getCurrentTime();
+      // Ensure we start from the beginning of the region if we are out of bounds or at the very end
+      if (current < regionStartRef.current || current >= regionEndRef.current - 0.1) {
+         ws.setTime(regionStartRef.current);
+      }
+      ws.play();
+    }
   };
 
   const handleStop = () => {
-    wavesurferRef.current?.stop();
+    if (!wavesurferRef.current) return;
+    const ws = wavesurferRef.current;
+    ws.pause();
+    ws.setTime(regionStartRef.current);
+    isPreviewingRef.current = false;
   };
 
   const handleAddRegion = () => {
@@ -125,6 +210,55 @@ export default function TrimTool({ onBack }: { onBack: () => void }) {
       resize: true,
       drag: true,
     });
+    setRegionStart(start);
+    setRegionEnd(end);
+  };
+
+  const handleManualRegionChange = (type: 'start' | 'end', val: number) => {
+    if (!regionsPluginRef.current || !wavesurferRef.current) return;
+    if (isNaN(val)) return;
+    
+    // Safety bounds
+    let newStart = type === 'start' ? val : regionStart;
+    let newEnd = type === 'end' ? val : regionEnd;
+
+    if (newStart < 0) newStart = 0;
+    if (newEnd > audioDuration) newEnd = audioDuration;
+    if (newStart >= newEnd) {
+       // Stop overlap
+       if (type === 'start') newStart = newEnd - 0.01;
+       if (type === 'end') newEnd = newStart + 0.01;
+    }
+
+    setRegionStart(newStart);
+    setRegionEnd(newEnd);
+    regionStartRef.current = newStart;
+    regionEndRef.current = newEnd;
+
+    const regions = regionsPluginRef.current.getRegions();
+    if (regions.length > 0) {
+      regions[0].setOptions({
+        start: newStart,
+        end: newEnd,
+      });
+      
+      // Real-time auditory preview!
+      const ws = wavesurferRef.current;
+      const seekTarget = type === 'start' ? newStart : Math.max(newStart, newEnd - 1.5);
+      ws.setTime(seekTarget);
+      isPreviewingRef.current = true;
+      if (!ws.isPlaying()) {
+          ws.play();
+      }
+    } else {
+      regionsPluginRef.current.addRegion({
+        start: newStart,
+        end: newEnd,
+        color: 'rgba(255, 255, 255, 0.2)',
+        resize: true,
+        drag: true,
+      });
+    }
   };
 
   const handleCrop = async () => {
@@ -287,6 +421,122 @@ export default function TrimTool({ onBack }: { onBack: () => void }) {
             <div ref={containerRef} className="w-full mb-4" />
             <div ref={timelineRef} className="w-full text-xs font-mono text-white/40" />
           </div>
+          
+          {hasRegion && (
+            <div className="flex flex-col gap-4 mt-4 p-4 rounded-xl border border-white/5 bg-[#090A0F] z-10 relative shadow-inner">
+              <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                <div className="text-xs font-bold uppercase tracking-widest text-white/50">Precision Step Offset</div>
+                <select
+                  value={trimStep}
+                  onChange={(e) => setTrimStep(parseFloat(e.target.value))}
+                  className="bg-white/5 border border-white/10 text-white text-xs font-mono rounded px-3 py-1.5 outline-none focus:border-[#FF5C00] transition-colors"
+                  aria-label="Select trim increment amount"
+                >
+                  {STEP_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value} className="bg-[#0D0E14]">{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-6">
+                <div className="flex flex-col flex-1">
+                  <div className="flex items-center justify-between mb-2 text-xs font-bold uppercase tracking-widest text-white/60">
+                     <label htmlFor="trim-start-range">Start precise filter</label>
+                     <div className="flex items-center gap-1">
+                       <input
+                         type="number"
+                         value={Number(regionStart).toFixed(3).replace(/\.?0+$/, '') || regionStart}
+                         onChange={(e) => handleManualRegionChange('start', parseFloat(e.target.value))}
+                         className="bg-transparent text-[#FF5C00] font-mono text-right w-20 outline-none border-b border-[#FF5C00]/30 focus:border-[#FF5C00] transition-colors"
+                         step={0.01}
+                         min={0}
+                         max={audioDuration}
+                         aria-label="Exact start time input"
+                       />
+                       <span className="text-[#FF5C00]">s</span>
+                     </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => handleManualRegionChange('start', regionStart - trimStep)}
+                      aria-label={`Decrease start time by ${trimStep} seconds`}
+                      className="h-8 flex items-center justify-center gap-1 px-2 rounded bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors flex-shrink-0"
+                    >
+                      <Minus className="w-4 h-4" aria-hidden="true" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Dec</span>
+                    </button>
+                    <input 
+                      id="trim-start-range"
+                      type="range"
+                      min={0}
+                      max={audioDuration}
+                      step={0.01}
+                      value={regionStart}
+                      onChange={(e) => handleManualRegionChange('start', parseFloat(e.target.value))}
+                      className="accent-[#FF5C00] w-full"
+                      aria-label="Start precise filter slider"
+                    />
+                    <button 
+                      onClick={() => handleManualRegionChange('start', regionStart + trimStep)}
+                      aria-label={`Increase start time by ${trimStep} seconds`}
+                      className="h-8 flex items-center justify-center gap-1 px-2 rounded bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors flex-shrink-0"
+                    >
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Inc</span>
+                      <Plus className="w-4 h-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col flex-1">
+                   <div className="flex items-center justify-between mb-2 text-xs font-bold uppercase tracking-widest text-white/60">
+                     <label htmlFor="trim-end-range">End precise filter</label>
+                     <div className="flex items-center gap-1">
+                       <input
+                         type="number"
+                         value={Number(regionEnd).toFixed(3).replace(/\.?0+$/, '') || regionEnd}
+                         onChange={(e) => handleManualRegionChange('end', parseFloat(e.target.value))}
+                         className="bg-transparent text-[#FF5C00] font-mono text-right w-20 outline-none border-b border-[#FF5C00]/30 focus:border-[#FF5C00] transition-colors"
+                         step={0.01}
+                         min={0}
+                         max={audioDuration}
+                         aria-label="Exact end time input"
+                       />
+                       <span className="text-[#FF5C00]">s</span>
+                     </div>
+                   </div>
+                   <div className="flex items-center gap-3">
+                     <button 
+                       onClick={() => handleManualRegionChange('end', regionEnd - trimStep)}
+                       aria-label={`Decrease end time by ${trimStep} seconds`}
+                       className="h-8 flex items-center justify-center gap-1 px-2 rounded bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors flex-shrink-0"
+                     >
+                       <Minus className="w-4 h-4" aria-hidden="true" />
+                       <span className="text-[10px] font-bold uppercase tracking-wider">Dec</span>
+                     </button>
+                     <input 
+                      id="trim-end-range"
+                      type="range"
+                      min={0}
+                      max={audioDuration}
+                      step={0.01}
+                      value={regionEnd}
+                      onChange={(e) => handleManualRegionChange('end', parseFloat(e.target.value))}
+                      className="accent-[#FF5C00] w-full"
+                      aria-label="End precise filter slider"
+                     />
+                     <button 
+                       onClick={() => handleManualRegionChange('end', regionEnd + trimStep)}
+                       aria-label={`Increase end time by ${trimStep} seconds`}
+                       className="h-8 flex items-center justify-center gap-1 px-2 rounded bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors flex-shrink-0"
+                     >
+                       <span className="text-[10px] font-bold uppercase tracking-wider">Inc</span>
+                       <Plus className="w-4 h-4" aria-hidden="true" />
+                     </button>
+                   </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {audioBlob && (
@@ -301,10 +551,11 @@ export default function TrimTool({ onBack }: { onBack: () => void }) {
                </button>
                <button 
                 onClick={handlePlayPause} 
-                aria-label={isPlaying ? "Pause playback" : "Play audio"}
-                className="w-16 h-16 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+                aria-label={isPlaying ? "Pause playback" : "Play and Preview"}
+                className="flex items-center gap-3 px-6 h-12 rounded-full bg-[#00E0FF]/10 border border-[#00E0FF]/30 text-[#00E0FF] hover:bg-[#00E0FF]/20 transition-colors uppercase text-sm font-bold tracking-widest glow-cyan"
                >
-                 {isPlaying ? <Pause className="w-6 h-6" aria-hidden="true" /> : <Play className="w-6 h-6 translate-x-1" aria-hidden="true" />}
+                 {isPlaying ? <Pause className="w-5 h-5" aria-hidden="true" /> : <Play className="w-5 h-5" aria-hidden="true" />}
+                 {isPlaying ? "Pause" : "Play and Preview"}
                </button>
              </div>
 

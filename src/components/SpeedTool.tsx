@@ -16,7 +16,7 @@ export default function SpeedTool({ onBack }: { onBack: () => void }) {
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [speed, setSpeed] = useState<number>(1.0);
-  const [pitch, setPitch] = useState<number>(0);
+  const [pitch, setPitch] = useState<number>(50); // 50% is normal (0 pitch shift)
 
   const pitchShiftRef = useRef<Tone.PitchShift | null>(null);
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -107,9 +107,10 @@ export default function SpeedTool({ onBack }: { onBack: () => void }) {
         
         if (pitchShiftRef.current) {
              // Analog playback forces a pitch change proportional to speed. 
-             // We compensate so the final output matches exactly the requested pitch semitones!
+             // We compensate so the final output matches exactly the requested pitch!
+             const targetPitchSemitones = (pitch - 50) * 0.48; // Map 0-100% to -24 to +24 semitones
              const speedPitchOffset = 12 * Math.log2(speed);
-             pitchShiftRef.current.pitch = pitch - speedPitchOffset;
+             pitchShiftRef.current.pitch = targetPitchSemitones - speedPitchOffset;
         }
       } catch (err) {
         console.error("Playback set err", err);
@@ -148,7 +149,7 @@ export default function SpeedTool({ onBack }: { onBack: () => void }) {
 
     setFileName(file.name);
     setSpeed(1.0);
-    setPitch(0);
+    setPitch(50);
     resetAudioBlob(file);
   };
 
@@ -163,7 +164,7 @@ export default function SpeedTool({ onBack }: { onBack: () => void }) {
 
   const handleApplySpeed = async () => {
     if (!audioBlob) return;
-    if (speed === 1.0 && pitch === 0) {
+    if (speed === 1.0 && pitch === 50) {
       alert("No changes to apply.");
       return;
     }
@@ -175,8 +176,9 @@ export default function SpeedTool({ onBack }: { onBack: () => void }) {
           const buf = new Tone.ToneAudioBuffer(url, () => resolve(buf), (err) => reject(err));
       });
       
+      const actualPitchSemitones = (pitch - 50) * 0.48; // Map percentage to semitones
       const speedPitchOffset = 12 * Math.log2(speed);
-      const compensationPitch = pitch - speedPitchOffset; 
+      const compensationPitch = actualPitchSemitones - speedPitchOffset; 
       
       const duration = buffer.duration / speed;
       
@@ -194,7 +196,7 @@ export default function SpeedTool({ onBack }: { onBack: () => void }) {
       
       pushAudioBlob(newBlob);
       setSpeed(1.0); 
-      setPitch(0);
+      setPitch(50);
     } catch (e) {
       console.error(e);
       alert("Failed to apply speed and pitch changes.");
@@ -243,7 +245,7 @@ export default function SpeedTool({ onBack }: { onBack: () => void }) {
           <div className="flex items-center gap-3">
             <button 
               onClick={handleApplySpeed}
-              disabled={!audioBlob || isProcessing || (speed === 1.0 && pitch === 0)}
+              disabled={!audioBlob || isProcessing || (speed === 1.0 && pitch === 50)}
               aria-label={isProcessing ? "Processing rendering..." : "Apply changes offline"}
               className="flex items-center gap-2 px-4 py-2 rounded bg-[#D946EF] text-[#090A0F] hover:bg-fuchsia-500 transition-colors uppercase text-xs font-bold tracking-widest disabled:opacity-30 disabled:cursor-not-allowed glow-fuchsia"
             >
@@ -302,26 +304,26 @@ export default function SpeedTool({ onBack }: { onBack: () => void }) {
                 <div className="flex items-center justify-between mb-3">
                   <label htmlFor="pitch-slider" className="text-xs font-bold text-white/70 uppercase tracking-widest">Independent Pitch Shift</label>
                   <span className="text-xs font-mono font-bold text-[#D946EF] bg-[#D946EF]/10 px-2 py-0.5 rounded">
-                    {pitch > 0 ? '+' : ''}{pitch} {Math.abs(pitch) === 1 ? 'step' : 'steps'}
+                    {pitch}%
                   </span>
                 </div>
                 <input 
                   id="pitch-slider"
                   type="range" 
-                  min="-24" 
-                  max="24" 
+                  min="0" 
+                  max="100" 
                   step="1" 
                   value={pitch}
                   onChange={handlePitchChange}
                   className="accent-[#D946EF] w-full"
-                  aria-label="Adjust pitch independently of speed in semitones"
+                  aria-label="Adjust pitch independently of speed. 50% is normal."
                 />
               </div>
             </div>
 
             <div className="flex flex-col gap-3 justify-end pb-1 w-24">
               <button
-                 onClick={() => { undoAudio(); setSpeed(1.0); setPitch(0); }}
+                 onClick={() => { undoAudio(); setSpeed(1.0); setPitch(50); }}
                  disabled={!canUndoAudio}
                  aria-label="Undo last action"
                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-[10px] font-bold tracking-widest text-white hover:bg-white/10 hover:border-white/30 transition-all uppercase disabled:opacity-30 disabled:cursor-not-allowed"
@@ -329,7 +331,7 @@ export default function SpeedTool({ onBack }: { onBack: () => void }) {
                 Undo
               </button>
               <button
-                 onClick={() => { redoAudio(); setSpeed(1.0); setPitch(0); }}
+                 onClick={() => { redoAudio(); setSpeed(1.0); setPitch(50); }}
                  disabled={!canRedoAudio}
                  aria-label="Redo last action"
                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-[10px] font-bold tracking-widest text-white hover:bg-white/10 hover:border-white/30 transition-all uppercase disabled:opacity-30 disabled:cursor-not-allowed"

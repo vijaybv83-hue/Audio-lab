@@ -1,21 +1,23 @@
 import React from 'react';
-import { Scissors, ArrowRight, Layers, Gauge } from 'lucide-react';
+import { Scissors, ArrowRight, Layers, Gauge, Sparkles, Wand2 } from 'lucide-react';
 
-export default function Home({ onSelectTool }: { onSelectTool: (tool: 'trim' | 'merge' | 'speed') => void }) {
+export default function Home({ onSelectTool }: { onSelectTool: (tool: 'trim' | 'merge' | 'speed' | 'enhance' | 'effects' | 'lyrics') => void }) {
   return (
     <div className="flex flex-col min-h-screen bg-[#07080B] text-[#E0E0E6] items-center justify-center p-6 font-sans">
-      <div className="max-w-4xl w-full">
+      <div className="max-w-6xl w-full">
         <header className="mb-12 text-center">
           <div className="inline-flex items-center justify-center space-x-3 mb-4">
             <div className="w-3 h-3 rounded-full bg-[#00E0FF] glow-blue"></div>
             <h1 className="text-4xl font-bold tracking-tighter uppercase italic">Audio Lab</h1>
             <div className="w-3 h-3 rounded-full bg-[#FF5C00] glow-orange"></div>
             <div className="w-3 h-3 rounded-full bg-[#D946EF] glow-fuchsia flex sm:hidden md:flex"></div>
+            <div className="w-3 h-3 rounded-full bg-[#10B981] glow-emerald flex sm:hidden md:flex"></div>
+            <div className="w-3 h-3 rounded-full bg-[#F59E0B] glow-amber flex sm:hidden md:flex"></div>
           </div>
           <p className="text-sm font-mono text-white/40 tracking-widest uppercase block">Select an audio production tool</p>
         </header>
 
-        <div className="grid md:grid-cols-3 gap-6" role="navigation" aria-label="Tool selection">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6" role="navigation" aria-label="Tool selection">
           {/* Trim Tool Card */}
           <button
             onClick={() => onSelectTool('trim')}
@@ -67,6 +69,63 @@ export default function Home({ onSelectTool }: { onSelectTool: (tool: 'trim' | '
             <h2 className="text-2xl font-bold tracking-tight mb-2">Speed Changer</h2>
             <p className="text-white/40 text-sm mb-8">
               Modify the speed and pitch of your audio track. Slow things down to a crawl or speed them up organically.
+            </p>
+            <div className="mt-auto flex items-center gap-2 text-[#D946EF] text-sm font-bold uppercase tracking-widest opacity-60 group-hover:opacity-100 group-hover:translate-x-2 transition-all">
+              Launch Tool <ArrowRight className="w-4 h-4 ml-1" aria-hidden="true" />
+            </div>
+          </button>
+
+          {/* Smart Enhance Card */}
+          <button
+            onClick={() => onSelectTool('enhance')}
+            aria-label="Launch Smart Enhance Tool"
+            className="group relative flex flex-col items-start p-8 text-left border border-white/5 bg-[#090A0F] rounded-2xl hover:border-[#10B981]/50 hover:bg-[#10B981]/5 transition-all duration-300 overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#10B981] opacity-10 blur-[50px] group-hover:opacity-20 transition-opacity pointer-events-none"></div>
+            <div className="w-14 h-14 rounded-full bg-[#10B981]/10 flex items-center justify-center text-[#10B981] mb-6 group-hover:scale-110 transition-transform">
+              <Sparkles className="w-7 h-7" aria-hidden="true" />
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight mb-2">Smart Enhance</h2>
+            <p className="text-white/40 text-sm mb-8">
+              Automatically improve audio quality dynamically. Reduce background noise, clarify frequencies, and master tracks for professional tightness.
+            </p>
+            <div className="mt-auto flex items-center gap-2 text-[#10B981] text-sm font-bold uppercase tracking-widest opacity-60 group-hover:opacity-100 group-hover:translate-x-2 transition-all">
+              Launch Tool <ArrowRight className="w-4 h-4 ml-1" aria-hidden="true" />
+            </div>
+          </button>
+
+          {/* Effects Studio Card */}
+          <button
+            onClick={() => onSelectTool('effects')}
+            aria-label="Launch FX Studio Tool"
+            className="group relative flex flex-col items-start p-8 text-left border border-white/5 bg-[#090A0F] rounded-2xl hover:border-[#F59E0B]/50 hover:bg-[#F59E0B]/5 transition-all duration-300 overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#F59E0B] opacity-10 blur-[50px] group-hover:opacity-20 transition-opacity pointer-events-none"></div>
+            <div className="w-14 h-14 rounded-full bg-[#F59E0B]/10 flex items-center justify-center text-[#F59E0B] mb-6 group-hover:scale-110 transition-transform">
+              <Wand2 className="w-7 h-7" aria-hidden="true" />
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight mb-2">FX Studio</h2>
+            <p className="text-white/40 text-sm mb-8">
+              Separate effects environment. Apply Analog Echo, Stadium Reverb, Chorus, and other filters manually, baking them aggressively into your mix.
+            </p>
+            <div className="mt-auto flex items-center gap-2 text-[#F59E0B] text-sm font-bold uppercase tracking-widest opacity-60 group-hover:opacity-100 group-hover:translate-x-2 transition-all">
+              Launch Tool <ArrowRight className="w-4 h-4 ml-1" aria-hidden="true" />
+            </div>
+          </button>
+
+          {/* Song Lyrics Card */}
+          <button
+            onClick={() => onSelectTool('lyrics')}
+            aria-label="Launch Song Lyrics Tool"
+            className="group relative flex flex-col items-start p-8 text-left border border-white/5 bg-[#090A0F] rounded-2xl hover:border-[#D946EF]/50 hover:bg-[#D946EF]/5 transition-all duration-300 overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#D946EF] opacity-10 blur-[50px] group-hover:opacity-20 transition-opacity pointer-events-none"></div>
+            <div className="w-14 h-14 rounded-full bg-[#D946EF]/10 flex items-center justify-center text-[#D946EF] mb-6 group-hover:scale-110 transition-transform">
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight mb-2">Song Lyrics</h2>
+            <p className="text-white/40 text-sm mb-8">
+              Download lyrics instantly online or upload an audio file to have the AI transcribe vocal stems. Export directly to readable PDF formats.
             </p>
             <div className="mt-auto flex items-center gap-2 text-[#D946EF] text-sm font-bold uppercase tracking-widest opacity-60 group-hover:opacity-100 group-hover:translate-x-2 transition-all">
               Launch Tool <ArrowRight className="w-4 h-4 ml-1" aria-hidden="true" />
